@@ -1,0 +1,89 @@
+name: CD - Build y Deploy a AWS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write   # Necesario para OIDC
+  contents: read    # Necesario para actions/checkout
+
+jobs:
+  # -------------------------------------------------------
+  # JOB 1: Construir la imagen Docker y subirla a ECR
+  # -------------------------------------------------------
+  build-and-push:
+    name: Build y Push a ECR
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # Autenticarse en AWS usando OIDC (sin Access Keys estáticas)
+      - name: Configurar credenciales AWS con OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Login en Amazon ECR
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Construir, etiquetar y subir la imagen a ECR
+      - name: Build, Tag y Push de la imagen Docker
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ vars.ECR_REPOSITORY }}:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/${{ vars.ECR_REPOSITORY }}:$IMAGE_TAG
+          # También etiquetamos como 'latest'
+          docker tag $ECR_REGISTRY/${{ vars.ECR_REPOSITORY }}:$IMAGE_TAG \
+                     $ECR_REGISTRY/${{ vars.ECR_REPOSITORY }}:latest
+          docker push $ECR_REGISTRY/${{ vars.ECR_REPOSITORY }}:latest
+          echo "image=$ECR_REGISTRY/${{ vars.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # -------------------------------------------------------
+  # JOB 2: Desplegar en ECS Fargate (requiere aprobación manual)
+  # -------------------------------------------------------
+  deploy-to-production:
+    name: Deploy a Producción
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production  # <-- Requiere aprobación manual del reviewer
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # Volver a autenticarse en AWS para este job
+      - name: Configurar credenciales AWS con OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Actualizar el task definition con la nueva URI de la imagen
+      - name: Actualizar imagen en el Task Definition de ECS
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ vars.ECS_TASK_DEFINITION }}
+          container-name: ${{ vars.CONTAINER_NAME }}
+          image: ${{ needs.build-and-push.outputs.image }}
+
+      # Desplegar la nueva revisión del task definition en ECS
+      - name: Desplegar en Amazon ECS con Rolling Update
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ vars.ECS_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          wait-for-service-stability: true  # Espera hasta Zero Downtime completado
