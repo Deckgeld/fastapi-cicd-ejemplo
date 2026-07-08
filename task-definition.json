@@ -2,7 +2,7 @@
   "containerDefinitions": [
     {
       "name": "fastapi-api",
-      "image": "147885329467.dkr.ecr.eu-north-1.amazonaws.com/fastapi-cicd-ejemplo:latest",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<ECR_REPOSITORY_NAME>:latest",
       "cpu": 0,
       "portMappings": [
         {
@@ -14,7 +14,12 @@
         }
       ],
       "essential": true,
-      "environment": [],
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        }
+      ],
       "environmentFiles": [],
       "mountPoints": [],
       "volumesFrom": [],
@@ -24,7 +29,7 @@
         "options": {
           "awslogs-group": "/ecs/fastapi-cicd-task",
           "awslogs-create-group": "true",
-          "awslogs-region": "eu-north-1",
+          "awslogs-region": "<AWS_REGION>",
           "awslogs-stream-prefix": "ecs"
         },
         "secretOptions": []
@@ -39,21 +44,11 @@
         "retries": 10,
         "startPeriod": 3
       },
-      "systemControls": [],
-      "secrets": [
-        {
-          "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:secretsmanager:eu-north-1:147885329467:secret:prod/fastapi-cicd/config-mu8s63:DATABASE_URL::"
-        },
-        {
-          "name": "SECRET_KEY",
-          "valueFrom": "arn:aws:secretsmanager:eu-north-1:147885329467:secret:prod/fastapi-cicd/config-mu8s63:SECRET_KEY::"
-        }
-      ]
+      "systemControls": []
     }
   ],
   "family": "fastapi-cicd-task",
-  "executionRoleArn": "arn:aws:iam::147885329467:role/EcsExecutionRole",
+  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/EcsExecutionRole",
   "networkMode": "awsvpc",
   "volumes": [],
   "placementConstraints": [],
@@ -66,5 +61,10 @@
   ],
   "cpu": "256",
   "memory": "2048",
-  "tags": []
+  "tags": [
+    {
+      "key": "Project",
+      "value": "fastapi-cicd-ejemplo"
+    }
+  ]
 }
