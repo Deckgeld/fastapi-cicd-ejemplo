@@ -15,3 +15,11 @@ build/
 venv/
 .venv/
 env/
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfvars
+infra/.terraform.lock.hcl
+infra/*.tfplan
