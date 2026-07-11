@@ -1,12 +1,30 @@
 # Alarmas de CloudWatch
 
-Puedes crear alarmas básicas para monitorear el servicio.
+Las alarmas principales se crean automáticamente con Terraform (`infra/cloudwatch.tf`).
 
-## Alarma de CPU alta
+Si prefieres crearlas manualmente, también puedes usar los comandos de AWS CLI más abajo.
+
+---
+
+## Alarmas gestionadas por Terraform
+
+| Alarma | Métrica | Descripción |
+|---|---|---|
+| `fastapi-cicd-cpu-high` | CPUUtilization | CPU superior al 80% |
+| `fastapi-cicd-memory-high` | MemoryUtilization | Memoria superior al 80% |
+| `fastapi-cicd-unhealthy-hosts` | UnHealthyHostCount | Tareas no saludables en el ALB |
+
+Para recibir notificaciones, añade `alarm_actions` con el ARN de un SNS Topic en `infra/cloudwatch.tf`.
+
+---
+
+## Crear alarmas manualmente con AWS CLI
+
+### Alarma de CPU alta
 
 ```bash
 aws cloudwatch put-metric-alarm \
-  --alarm-name fastapi-cpu-high \
+  --alarm-name fastapi-cicd-cpu-high \
   --alarm-description "CPU superior al 80%" \
   --metric-name CPUUtilization \
   --namespace AWS/ECS \
@@ -19,11 +37,11 @@ aws cloudwatch put-metric-alarm \
   --region eu-north-1
 ```
 
-## Alarma de memoria alta
+### Alarma de memoria alta
 
 ```bash
 aws cloudwatch put-metric-alarm \
-  --alarm-name fastapi-memory-high \
+  --alarm-name fastapi-cicd-memory-high \
   --alarm-description "Memoria superior al 80%" \
   --metric-name MemoryUtilization \
   --namespace AWS/ECS \
@@ -36,11 +54,11 @@ aws cloudwatch put-metric-alarm \
   --region eu-north-1
 ```
 
-## Alarma por tareas no saludables
+### Alarma por tareas no saludables
 
 ```bash
 aws cloudwatch put-metric-alarm \
-  --alarm-name fastapi-unhealthy-tasks \
+  --alarm-name fastapi-cicd-unhealthy-hosts \
   --alarm-description "Tareas no saludables" \
   --metric-name UnHealthyHostCount \
   --namespace AWS/ApplicationELB \

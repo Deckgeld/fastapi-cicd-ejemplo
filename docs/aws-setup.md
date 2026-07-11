@@ -131,18 +131,74 @@ Esto elimina todos los recursos creados por Terraform.
 
 ## Backend remoto (opcional pero recomendado)
 
-Por defecto, Terraform guarda el estado en un archivo local `terraform.tfstate`. Para trabajar en equipo, usa un backend remoto en S3.
+### ¿Qué es el estado de Terraform?
 
-Descomenta `infra/backend.tf` y crea previamente:
+Terraform guarda un **registro de todo lo que ha creado** en un archivo llamado `terraform.tfstate`. Ese archivo le permite a Terraform saber:
 
-- Un bucket S3 para el estado.
-- Una tabla DynamoDB para el bloqueo (locking).
+- Qué recursos ya existen en AWS.
+- Qué cambiar cuando modificas el código.
+- Qué destruir cuando ejecutas `terraform destroy`.
 
-Luego ejecuta:
+### ¿Por qué usar un backend remoto?
+
+Por defecto, el estado se guarda **localmente** en tu máquina. Esto funciona si trabajas solo, pero tiene problemas:
+
+| Problema | Consecuencia |
+|---|---|
+| Pierdes el archivo `terraform.tfstate` | Terraform no sabe qué recursos existen. Tendrías que importarlos manualmente uno a uno. |
+| Trabajas desde otra máquina | No tienes el estado actualizado y podrías crear recursos duplicados. |
+| Trabajas en equipo | Dos personas podrían aplicar cambios simultáneamente y romper la infraestructura. |
+
+Un **backend remoto en S3** resuelve esto:
+
+- El estado se guarda en un bucket de S3 accesible desde cualquier lugar.
+- Puedes trabajar desde tu laptop, otra PC o en equipo.
+- Puedes añadir una tabla DynamoDB para **bloquear el estado** y evitar que dos personas ejecuten `terraform apply` al mismo tiempo.
+
+### Configurar backend remoto
+
+1. Crea un bucket S3 para el estado:
 
 ```bash
+aws s3 mb s3://fastapi-cicd-terraform-state --region eu-north-1
+aws s3api put-bucket-versioning \
+  --bucket fastapi-cicd-terraform-state \
+  --versioning-configuration Status=Enabled
+```
+
+2. Crea una tabla DynamoDB para el bloqueo:
+
+```bash
+aws dynamodb create-table \
+  --table-name fastapi-cicd-terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region eu-north-1
+```
+
+3. Descomenta el contenido de `infra/backend.tf`:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "fastapi-cicd-terraform-state"
+    key            = "terraform.tfstate"
+    region         = "eu-north-1"
+    encrypt        = true
+    dynamodb_table = "fastapi-cicd-terraform-locks"
+  }
+}
+```
+
+4. Reinicializa Terraform:
+
+```bash
+cd infra
 terraform init -reconfigure
 ```
+
+Terraform te preguntará si quieres migrar el estado local al backend remoto. Responde **yes**.
 
 ---
 

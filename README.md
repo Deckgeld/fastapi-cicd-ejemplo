@@ -50,6 +50,7 @@ graph TB
         end
 
         CW[CloudWatch Logs<br/>/ecs/fastapi-cicd]
+        Alarms[CloudWatch Alarms<br/>CPU / Memoria /<br/>UnHealthyHosts]
     end
 
     IGW -->|tráfico entrante| ALB
@@ -72,12 +73,15 @@ graph TB
     TaskDef --> Task1
 
     Task1 -->|logs| CW
+    Cluster -->|métricas| Alarms
+    Service -->|métricas| Alarms
+    ALB -->|métricas| Alarms
 
     classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:#232F3E;
     classDef github fill:#333333,stroke:#000000,stroke-width:2px,color:#FFFFFF;
     classDef user fill:#1E8900,stroke:#145A00,stroke-width:2px,color:#FFFFFF;
 
-    class ALB,TG,VPC,AZ1,AZ2,IGW,RT,ECR,Cluster,Service,TaskDef,Task1,CW aws;
+    class ALB,TG,VPC,AZ1,AZ2,IGW,RT,ECR,Cluster,Service,TaskDef,Task1,CW,Alarms aws;
     class Repo,Actions,OIDC,GitHubRole,ExecRole,TaskRole github;
     class User user;
 ```
@@ -97,7 +101,8 @@ graph TB
 | **Infraestructura** | Terraform | Crea VPC, ALB, ECS, IAM |
 | **Compute** | AWS ECS Fargate | Ejecuta contenedores |
 | **Balanceador** | Application Load Balancer | Recibe y reparte tráfico HTTP |
-| **Logs** | Amazon CloudWatch | Guarda logs |
+| **Logs** | Amazon CloudWatch | Guarda logs de contenedores |
+| **Alarmas** | Amazon CloudWatch | Monitorea CPU, memoria y tareas no saludables |
 | **Auth** | IAM + OIDC | GitHub Actions accede a AWS sin claves estáticas |
 
 ### Flujo resumido
