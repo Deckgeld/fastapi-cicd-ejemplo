@@ -1,0 +1,6 @@
+# Copia este archivo como backend.hcl y reemplaza el nombre del bucket.
+bucket       = "tu-bucket-terraform-state"
+key          = "fastapi-cicd/terraform.tfstate"
+region       = "eu-north-1"
+encrypt      = true
+use_lockfile = true

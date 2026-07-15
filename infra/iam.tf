@@ -78,9 +78,12 @@ data "aws_iam_policy_document" "github_oidc" {
       values   = ["sts.amazonaws.com"]
     }
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:*"]
+      values = [
+        "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main",
+        "repo:${var.github_org}/${var.github_repo}:environment:production"
+      ]
     }
   }
 }
@@ -102,9 +105,13 @@ resource "aws_iam_role_policy" "github_actions" {
     Version = "2012-10-17"
     Statement = [
       {
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
         Effect = "Allow"
         Action = [
-          "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
@@ -113,17 +120,21 @@ resource "aws_iam_role_policy" "github_actions" {
           "ecr:CompleteLayerUpload",
           "ecr:PutImage"
         ]
-        Resource = "*"
+        Resource = aws_ecr_repository.app.arn
       },
       {
         Effect = "Allow"
         Action = [
           "ecs:DescribeTaskDefinition",
-          "ecs:RegisterTaskDefinition",
           "ecs:DescribeServices",
-          "ecs:UpdateService"
+          "ecs:RegisterTaskDefinition"
         ]
         Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ecs:UpdateService"
+        Resource = aws_ecs_service.app.id
       },
       {
         Effect = "Allow"

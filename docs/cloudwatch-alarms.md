@@ -1,74 +1,26 @@
-# Alarmas de CloudWatch
+# Logs y alarmas
 
-Las alarmas principales se crean automáticamente con Terraform (`infra/cloudwatch.tf`).
+Terraform crea las alarmas, el topic SNS y la suscripción de correo. No crees estos recursos manualmente: Terraform debe ser la única fuente de cambios de infraestructura.
 
-Si prefieres crearlas manualmente, también puedes usar los comandos de AWS CLI más abajo.
+## Activar notificaciones
 
----
+Al ejecutar `terraform apply`, AWS envía un correo a la dirección configurada como `alarm_email` en `infra/terraform.tfvars`. Abre el correo y confirma la suscripción. Sin esa confirmación, las alarmas existen pero no entregan avisos.
 
-## Alarmas gestionadas por Terraform
+## Qué vigilan
 
-| Alarma | Métrica | Descripción |
+| Alarma | Significado | Primera acción |
 |---|---|---|
-| `fastapi-cicd-cpu-high` | CPUUtilization | CPU superior al 80% |
-| `fastapi-cicd-memory-high` | MemoryUtilization | Memoria superior al 80% |
-| `fastapi-cicd-unhealthy-hosts` | UnHealthyHostCount | Tareas no saludables en el ALB |
+| `<proyecto>-cpu-high` | CPU media mayor de 80% durante 10 minutos. | Revisa logs y carga; considera aumentar CPU o número de tareas. |
+| `<proyecto>-memory-high` | Memoria media mayor de 80% durante 10 minutos. | Busca fugas o aumenta la memoria de la task. |
+| `<proyecto>-unhealthy-hosts` | El ALB detecta una tarea no saludable. | Abre los logs y comprueba `/health/ready`. |
 
-Para recibir notificaciones, añade `alarm_actions` con el ARN de un SNS Topic en `infra/cloudwatch.tf`.
+`<proyecto>` es el valor de `project_name`; con la configuración de ejemplo es `fastapi-cicd`.
 
----
+## Dónde investigar un problema
 
-## Crear alarmas manualmente con AWS CLI
+1. En GitHub, abre **Actions** para comprobar si el despliegue terminó correctamente.
+2. En AWS, abre **CloudWatch > Log groups > /ecs/<proyecto>** para ver los logs del contenedor.
+3. En AWS, abre **ECS > Clusters > <proyecto>-cluster > Services** para ver eventos, tareas detenidas y el motivo de fallo.
+4. En AWS, abre **CloudWatch > Alarms** para consultar el estado y el histórico de cada alarma.
 
-### Alarma de CPU alta
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name fastapi-cicd-cpu-high \
-  --alarm-description "CPU superior al 80%" \
-  --metric-name CPUUtilization \
-  --namespace AWS/ECS \
-  --statistic Average \
-  --period 300 \
-  --threshold 80 \
-  --comparison-operator GreaterThanThreshold \
-  --dimensions Name=ClusterName,Value=fastapi-cicd-cluster Name=ServiceName,Value=fastapi-cicd-service \
-  --evaluation-periods 2 \
-  --region eu-north-1
-```
-
-### Alarma de memoria alta
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name fastapi-cicd-memory-high \
-  --alarm-description "Memoria superior al 80%" \
-  --metric-name MemoryUtilization \
-  --namespace AWS/ECS \
-  --statistic Average \
-  --period 300 \
-  --threshold 80 \
-  --comparison-operator GreaterThanThreshold \
-  --dimensions Name=ClusterName,Value=fastapi-cicd-cluster Name=ServiceName,Value=fastapi-cicd-service \
-  --evaluation-periods 2 \
-  --region eu-north-1
-```
-
-### Alarma por tareas no saludables
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name fastapi-cicd-unhealthy-hosts \
-  --alarm-description "Tareas no saludables" \
-  --metric-name UnHealthyHostCount \
-  --namespace AWS/ApplicationELB \
-  --statistic Average \
-  --period 300 \
-  --threshold 1 \
-  --comparison-operator GreaterThanOrEqualToThreshold \
-  --dimensions Name=TargetGroup,Value=$TG_ARN Name=LoadBalancer,Value=$ALB_ARN \
-  --evaluation-periods 1 \
-  --region eu-north-1
-```
-
-> Para recibir notificaciones, crea un SNS Topic, suscríbe tu email y agrega `--alarm-actions arn:aws:sns:...` a cada comando.
+Las alarmas ayudan a detectar problemas; no corrigen ni escalan el servicio automáticamente. Eso sería un siguiente paso del laboratorio.

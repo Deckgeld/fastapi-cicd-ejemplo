@@ -1,6 +1,3 @@
-# Variables de entorno reales
-.env
-
 # Python
 __pycache__/
 *.pyc
@@ -21,5 +18,5 @@ infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.*
 infra/*.tfvars
-infra/.terraform.lock.hcl
 infra/*.tfplan
+infra/backend.hcl

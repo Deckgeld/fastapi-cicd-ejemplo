@@ -49,8 +49,9 @@ resource "aws_ecs_task_definition" "app" {
 
   container_definitions = jsonencode([
     {
-      name  = "${var.project_name}-container"
-      image = "${aws_ecr_repository.app.repository_url}:latest"
+      name = "${var.project_name}-container"
+      # CD sustituye esta imagen de arranque por un tag inmutable basado en el SHA.
+      image = "${aws_ecr_repository.app.repository_url}:bootstrap"
       portMappings = [
         {
           containerPort = var.container_port
@@ -67,7 +68,7 @@ resource "aws_ecs_task_definition" "app" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}/health/ready || exit 1"]
+        command     = ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:${var.container_port}/health/ready')"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -79,14 +80,25 @@ resource "aws_ecs_task_definition" "app" {
   tags = {
     Name = "${var.project_name}-task"
   }
+
+  # El workflow de CD administra el tag de imagen de cada revisión.
+  lifecycle {
+    ignore_changes = [container_definitions]
+  }
 }
 
 resource "aws_ecs_service" "app" {
-  name            = "${var.project_name}-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "${var.project_name}-service"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.app.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 60
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   network_configuration {
     subnets          = aws_subnet.public[*].id
@@ -104,5 +116,10 @@ resource "aws_ecs_service" "app" {
 
   tags = {
     Name = "${var.project_name}-service"
+  }
+
+  # CD registra la revisión y decide qué task definition ejecuta el servicio.
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 }

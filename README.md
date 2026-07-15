@@ -1,12 +1,10 @@
 # FastAPI CI/CD en AWS ECS Fargate
 
-Proyecto de aprendizaje de **DevOps**: una API mínima en FastAPI, empaquetada en Docker y desplegada automáticamente en **AWS ECS Fargate** usando **GitHub Actions** y **Terraform**.
+Laboratorio práctico para aprender cómo una modificación de código llega a producción: FastAPI se empaqueta con Docker, Terraform crea AWS y GitHub Actions prueba y despliega la imagen.
 
-> El objetivo no es la API en sí, sino aprender el flujo completo: código → CI → imagen Docker → CD → AWS.
+No hace falta conocer CI/CD, Terraform ni AWS antes de empezar. Sigue las guías en este orden y no saltes pasos.
 
----
-
-## Arquitectura
+## Qué construirás
 
 ```mermaid
 graph TB
@@ -65,9 +63,9 @@ graph TB
     Task1 -->|se ejecuta en| AZ1
 
     GitHubRole -->|push imagen| ECR
-    GitHubRole -->|register task /<br/>update service| Service
+    GitHubRole -->|registra revision y actualiza servicio| Service
 
-    ECR -->|imagen :latest| TaskDef
+    ECR -->|imagen con tag SHA| TaskDef
     Cluster --> Service
     Service --> TaskDef
     TaskDef --> Task1
@@ -86,102 +84,78 @@ graph TB
     class User user;
 ```
 
-> **¿Por qué dos zonas de disponibilidad?**
->
-> AWS exige al menos **2 subnets en distintas AZ** para crear un ALB. Aunque ahora haya solo 1 tarea en `eu-north-1a`, el ALB también tiene una interfaz de red en `eu-north-1b` para alta disponibilidad.
+### Vista rápida del despliegue
 
-### Componentes
-
-| Componente | Tecnología | Función |
-|---|---|---|
-| **Código fuente** | FastAPI + Python | API mínima con health checks |
-| **Contenedor** | Docker | Empaqueta la app |
-| **CI/CD** | GitHub Actions | Tests, linting, build y deploy |
-| **Imágenes** | Amazon ECR | Almacena imágenes Docker |
-| **Infraestructura** | Terraform | Crea VPC, ALB, ECS, IAM |
-| **Compute** | AWS ECS Fargate | Ejecuta contenedores |
-| **Balanceador** | Application Load Balancer | Recibe y reparte tráfico HTTP |
-| **Logs** | Amazon CloudWatch | Guarda logs de contenedores |
-| **Alarmas** | Amazon CloudWatch | Monitorea CPU, memoria y tareas no saludables |
-| **Auth** | IAM + OIDC | GitHub Actions accede a AWS sin claves estáticas |
-
-### Flujo resumido
-
-```text
-feature/* → PR a dev → CI → merge a dev → PR a main → CI → merge a main → CD → AWS ECS
+```mermaid
+flowchart LR
+    Code[Codigo en GitHub] --> CI[CI: lint y tests]
+    CI --> CD[CD: build y deploy]
+    CD -->|OIDC, sin claves AWS| ECR[ECR: imagen con SHA]
+    ECR --> ECS[ECS Fargate]
+    Internet --> ALB[ALB HTTP]
+    ALB --> ECS
+    ECS --> Logs[CloudWatch logs y alarmas]
 ```
 
-Para el flujo completo ver [`docs/ci-cd.md`](docs/ci-cd.md).
+| Concepto | En este proyecto |
+|---|---|
+| Docker | Empaqueta la API para ejecutarla igual en tu equipo y AWS. |
+| Terraform | Archivos que describen y crean la infraestructura AWS. |
+| CI | GitHub ejecuta lint y tests antes de integrar cambios. |
+| CD | GitHub crea una imagen y actualiza ECS después de aprobar el despliegue. |
+| ECS Fargate | Servicio AWS que ejecuta el contenedor sin administrar servidores. |
+| OIDC | GitHub obtiene permisos temporales en AWS, sin guardar Access Keys allí. |
 
----
+## Antes de empezar
 
-## Requisitos
+Necesitas una cuenta de GitHub, una cuenta AWS con facturación habilitada, Docker, AWS CLI y Terraform 1.10 o superior. Instala:
 
-- Cuenta de AWS.
-- Cuenta de GitHub.
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) configurada (`aws configure`).
-- [Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli) >= 1.5.0.
-- [Docker](https://docs.docker.com/get-docker/).
+- [Docker](https://docs.docker.com/get-docker/)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+- [Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 
----
+> AWS cobra por los recursos creados. El ALB y Fargate generan coste incluso sin tráfico. Destruye la infraestructura al terminar el laboratorio.
 
-## Estructura del proyecto
+### Free Tier y costes
 
-```text
-.
-├── app/                    # API mínima en FastAPI
-├── tests/                  # Tests con pytest
-├── infra/                  # Infraestructura con Terraform
-├── .github/workflows/      # CI/CD con GitHub Actions
-├── docs/                   # Documentación
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── requirements-dev.txt
-```
+Una cuenta AWS nueva puede incluir hasta $200 en créditos y un plan gratuito de hasta 6 meses. Este laboratorio puede consumir esos créditos porque usa ALB, Fargate e IPv4 públicas; revisa **AWS Console > Cost and Usage** antes de crear recursos y no cambies al plan de pago si quieres evitar cargos.
 
----
+Al terminar las pruebas, elimina los recursos con `terraform destroy` desde la carpeta `infra`. Consulta los límites y créditos vigentes en [AWS Free Tier](https://aws.amazon.com/free/).
 
-## Ejecutar localmente con Docker
+## Ruta de aprendizaje
 
-La app solo se ejecuta localmente mediante Docker.
+1. Crea una copia del repositorio en tu cuenta de GitHub mediante **Fork** y clónala en tu equipo.
+2. Comprueba la API localmente con Docker.
+3. Sigue [Crear infraestructura en AWS](docs/aws-setup.md).
+4. Sigue [Configurar CI/CD en GitHub](docs/ci-cd.md).
+5. Haz push a `main`, aprueba el entorno `production` y comprueba la API.
+6. Consulta [Logs y alarmas](docs/cloudwatch-alarms.md).
 
-### Con Docker Compose
+## Probar la API localmente
+
+Inicia Docker Desktop y ejecuta desde la raíz del proyecto:
 
 ```bash
 docker compose up --build
 ```
 
-### Con Docker directamente
+En otra terminal, abre `http://localhost:8000/docs` o ejecuta:
 
 ```bash
-docker build -t fastapi-cicd-ejemplo:local .
-docker run -p 8000:8000 fastapi-cicd-ejemplo:local
-```
-
-### Probar la API
-
-```bash
-curl http://localhost:8000/
 curl http://localhost:8000/health/ready
 ```
 
-Para detener: `Ctrl+C` o `docker compose down`.
+La respuesta esperada es `{"status":"ready"}`. Detén el contenedor con `docker compose down`.
 
----
+## Estructura
 
-## Desplegar en AWS
+```text
+app/                 API FastAPI
+tests/               Tests de la API
+infra/               Terraform: red, ECS, ECR, IAM y alarmas
+.github/workflows/   Automatizaciones de CI y CD
+```
 
-1. Crea la infraestructura con Terraform: [`docs/aws-setup.md`](docs/aws-setup.md).
-2. Configura GitHub: [`docs/ci-cd.md`](docs/ci-cd.md).
-3. Haz push a `main` y el pipeline despliega automáticamente.
+## Límites del laboratorio
 
----
-
-## Documentación
-
-| Archivo | Contenido |
-|---|---|
-| [`docs/ci-cd.md`](docs/ci-cd.md) | Configuración de GitHub Actions y flujo completo |
-| [`docs/aws-setup.md`](docs/aws-setup.md) | Crear infraestructura con Terraform |
-| [`docs/cloudwatch-alarms.md`](docs/cloudwatch-alarms.md) | Alarmas básicas de monitoreo |
+El ALB está expuesto por HTTP para simplificar el aprendizaje. Antes de usar esta arquitectura con usuarios reales, añade dominio, certificado ACM, HTTPS, redirección HTTP a HTTPS y una revisión de seguridad/costes.

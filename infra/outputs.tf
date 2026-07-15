@@ -3,6 +3,16 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.app.repository_url
 }
 
+output "project_name" {
+  description = "Prefijo usado para nombrar los recursos; úsalo como PROJECT_NAME en GitHub"
+  value       = var.project_name
+}
+
+output "aws_region" {
+  description = "Región del despliegue; úsala como AWS_REGION en GitHub"
+  value       = var.aws_region
+}
+
 output "alb_dns_name" {
   description = "DNS del Application Load Balancer"
   value       = aws_lb.main.dns_name

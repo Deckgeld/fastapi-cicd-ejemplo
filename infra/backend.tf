@@ -1,12 +1,5 @@
-# Backend remoto para el estado de Terraform.
-# Descomenta esta sección después de crear el bucket S3 y la tabla DynamoDB.
-#
-# terraform {
-#   backend "s3" {
-#     bucket         = "fastapi-cicd-terraform-state"
-#     key            = "terraform.tfstate"
-#     region         = "eu-north-1"
-#     encrypt        = true
-#     dynamodb_table = "fastapi-cicd-terraform-locks"
-#   }
-# }
+# El backend recibe sus valores desde backend.hcl, que no se versiona porque
+# contiene nombres globalmente únicos de cada cuenta AWS.
+terraform {
+  backend "s3" {}
+}

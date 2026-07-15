@@ -1,5 +1,19 @@
 # Alarmas de CloudWatch
 
+resource "aws_sns_topic" "alerts" {
+  name = "${var.project_name}-alerts"
+
+  tags = {
+    Name = "${var.project_name}-alerts"
+  }
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alarm_email
+}
+
 resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   alarm_name          = "${var.project_name}-cpu-high"
   alarm_description   = "CPU superior al 80%"
@@ -10,6 +24,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   period              = 300
   statistic           = "Average"
   threshold           = 80
+  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     ClusterName = aws_ecs_cluster.main.name
@@ -31,6 +46,7 @@ resource "aws_cloudwatch_metric_alarm" "memory_high" {
   period              = 300
   statistic           = "Average"
   threshold           = 80
+  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     ClusterName = aws_ecs_cluster.main.name
@@ -52,6 +68,7 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_hosts" {
   period              = 300
   statistic           = "Average"
   threshold           = 1
+  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     TargetGroup  = aws_lb_target_group.app.arn_suffix

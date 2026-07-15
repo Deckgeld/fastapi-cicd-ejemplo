@@ -27,3 +27,8 @@ variable "github_repo" {
   description = "Nombre del repositorio en GitHub"
   type        = string
 }
+
+variable "alarm_email" {
+  description = "Correo que recibirá las alarmas de CloudWatch; confirma la suscripción que enviará SNS"
+  type        = string
+}
