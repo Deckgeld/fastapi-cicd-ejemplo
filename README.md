@@ -160,3 +160,7 @@ infra/               Terraform: red, ECS, ECR, IAM y alarmas
 ## Límites del laboratorio
 
 El ALB está expuesto por HTTP para simplificar el aprendizaje. Antes de usar esta arquitectura con usuarios reales, añade dominio, certificado ACM, HTTPS, redirección HTTP a HTTPS y una revisión de seguridad/costes.
+
+## Siguiente versión
+
+Consulta [Integrar PostgreSQL en la siguiente versión](docs/database-integration.md) para planear persistencia de datos con RDS, Secrets Manager, migraciones y pruebas de integración.

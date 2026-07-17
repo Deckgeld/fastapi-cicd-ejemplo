@@ -7,6 +7,15 @@ CI/CD significa automatizar dos tareas:
 
 Esta guía tiene una fase de preparación de GitHub antes de crear AWS y otra posterior para guardar los outputs de Terraform y desplegar.
 
+## Workflows del proyecto
+
+| Archivo | Cuándo se ejecuta | Qué hace |
+|---|---|---|
+| `ci.yml` | Pull Request hacia `dev` o `main`, y push a `main` | Instala dependencias, ejecuta lint y tests. El check se llama `Lint y Tests`. |
+| `cd.yml` | Push a `main` o ejecución manual | Valida el código, publica la imagen en ECR y, tras aprobar `production`, actualiza ECS. |
+
+El workflow de CD usa OIDC para recibir credenciales AWS temporales. No guarda Access Keys en GitHub.
+
 ## Fase 1: preparar GitHub antes de AWS
 
 Antes del primer despliegue, revisa estas opciones en GitHub:
@@ -31,6 +40,8 @@ En GitHub, ve a **Settings > Environments > New environment** y crea uno llamado
 | **Deployment branches and tags** | Selecciona solo `main`. | Impide que otra rama despliegue a producción. |
 
 Deja desactivados el temporizador, las reglas de GitHub Apps y el bypass de administradores. Deja vacíos los secretos y variables del entorno: este proyecto no los usa ahí.
+
+El entorno solo protege el job de despliegue con aprobación manual. El job que construye y sube la imagen a ECR se ejecuta antes de entrar en `production`, por lo que sus secretos y variables deben estar a nivel de repositorio.
 
 Pulsa **Save protection rules**. Después continúa con [Crear AWS con Terraform](aws-setup.md).
 
@@ -88,13 +99,13 @@ Terraform imprimió tres valores al terminar. En GitHub, abre tu repositorio y v
 
 ### Crear el secret
 
-En **Secrets**, crea este valor:
+En **Secrets**, crea este **Repository secret**:
 
 | Nombre | Valor que debes pegar |
 |---|---|
 | `AWS_ROLE_TO_ASSUME` | Output de Terraform `github_actions_role_arn` |
 
-Un secret se oculta en los logs. Aunque un ARN no es una contraseña, lo guardamos ahí para agrupar toda la configuración de acceso AWS.
+Pega el ARN completo del output, no su nombre. No lo crees dentro de `production`: el job de build necesita asumir el rol AWS antes de llegar a ese entorno.
 
 ### Crear las variables
 
@@ -104,6 +115,8 @@ En **Variables**, crea estos dos valores:
 |---|---|
 | `AWS_REGION` | Output de Terraform `aws_region`, por ejemplo `us-east-2` |
 | `PROJECT_NAME` | Output de Terraform `project_name`, por ejemplo `fastapi-cicd` |
+
+Escribe el valor de cada output, no el nombre de la variable: por ejemplo, el valor de `AWS_REGION` debe ser `us-east-2`, no `AWS_REGION`. Crea estos valores como **Repository variables**, no como variables de `production`.
 
 En el workflow, `${{ vars.AWS_REGION }}` significa "lee la variable `AWS_REGION` guardada en GitHub". Después se convierte en `AWS_REGION` para los comandos que se ejecutan durante el workflow.
 
@@ -130,6 +143,15 @@ Después abre la dirección `alb_dns_name` que obtuviste con Terraform y añade 
 5. ECS inicia tareas nuevas. El ALB solo les envía tráfico si `/health/ready` responde correctamente.
 
 Terraform crea la infraestructura inicial. GitHub CD gestiona las revisiones de la imagen para que un `terraform apply` posterior no deshaga un despliegue correcto.
+
+## Volver a una versión anterior
+
+Cada imagen en ECR usa el SHA del commit como etiqueta y ECS conserva las revisiones anteriores de la task definition.
+
+- Si la nueva tarea no inicia o no supera `/health/ready`, ECS usa el deployment circuit breaker y vuelve automáticamente a la última revisión estable.
+- Si la aplicación inicia correctamente pero tiene un error funcional, abre **Actions**, selecciona una ejecución anterior que terminó en verde y usa **Re-run all jobs**. Esa ejecución vuelve a publicar y desplegar la imagen del commit anterior.
+
+Después del rollback, crea un Pull Request que revierta o corrija el cambio defectuoso. Así, el código de `main` vuelve a coincidir con la versión que está en producción.
 
 ## Si algo falla
 

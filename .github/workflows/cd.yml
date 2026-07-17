@@ -43,7 +43,7 @@ jobs:
 
       # Autenticarse en AWS usando OIDC (sin Access Keys estáticas)
       - name: Configurar credenciales AWS con OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
@@ -79,7 +79,7 @@ jobs:
 
       # Volver a autenticarse en AWS para este job
       - name: Configurar credenciales AWS con OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}

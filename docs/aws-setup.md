@@ -71,7 +71,7 @@ alarm_email  = "tu-correo@example.com" # Donde recibiras alertas
 Todavía dentro de `infra`, ejecuta estos comandos en orden:
 
 ```bash
-terraform init --backend-config=backend.hcl
+terraform init -backend-config=backend.hcl
 terraform plan
 terraform apply
 ```
@@ -95,6 +95,15 @@ terraform output alb_dns_name
 ```
 
 Abre `http://<direccion-del-alb>/docs` en el navegador. Este laboratorio usa HTTP; no introduzcas datos reales.
+
+## Opcional: habilitar HTTPS con tu dominio
+
+1. Solicita en ACM, región `us-east-2`, un certificado público para un subdominio como `api.tudominio.com`.
+2. Valídalo por DNS creando el registro CNAME que entrega ACM en tu proveedor de dominio.
+3. Añade al ALB un listener HTTPS en el puerto `443` con ese certificado, permite el puerto `443` en su security group y redirige el puerto `80` a HTTPS.
+4. Crea un registro DNS para que `api.tudominio.com` apunte al ALB.
+
+El certificado público de ACM no tiene coste. El dominio, la zona DNS y las consultas pueden tenerlo según el proveedor.
 
 ## Cuando termines el laboratorio
 
