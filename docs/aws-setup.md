@@ -32,7 +32,7 @@ Terraform necesita recordar qué recursos creó. Ese registro se llama **state**
 Elige un nombre globalmente único, por ejemplo `tu-usuario-fastapi-state-1234`. En los comandos, reemplaza `<BUCKET_UNICO>` por ese nombre, sin los símbolos `< >`.
 
 ```bash
-aws s3api create-bucket --bucket <BUCKET_UNICO> --region eu-north-1 --create-bucket-configuration LocationConstraint=eu-north-1
+aws s3api create-bucket --bucket <BUCKET_UNICO> --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
 aws s3api put-bucket-versioning --bucket <BUCKET_UNICO> --versioning-configuration Status=Enabled
 aws s3api put-public-access-block --bucket <BUCKET_UNICO> --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
@@ -57,7 +57,7 @@ cp terraform.tfvars.example terraform.tfvars
 Abre `terraform.tfvars` y completa estos valores:
 
 ```hcl
-aws_region   = "eu-north-1"           # Region AWS elegida
+aws_region   = "us-east-2"            # Ohio, cercana a Mexico
 project_name = "fastapi-cicd"          # Prefijo de los recursos creados
 github_org   = "tu-usuario-github"     # Tu usuario u organizacion GitHub
 github_repo  = "nombre-del-repo"       # Nombre exacto del repositorio
@@ -71,7 +71,7 @@ alarm_email  = "tu-correo@example.com" # Donde recibiras alertas
 Todavía dentro de `infra`, ejecuta estos comandos en orden:
 
 ```bash
-terraform init -backend-config=backend.hcl
+terraform init --backend-config=backend.hcl
 terraform plan
 terraform apply
 ```
@@ -80,15 +80,15 @@ terraform apply
 - `plan` muestra lo que AWS va a crear. Revísalo; aún no cambia nada.
 - `apply` crea los recursos. Escribe `yes` cuando Terraform lo solicite.
 
-Al terminar, guarda tres outputs: `github_actions_role_arn`, `aws_region` y `project_name`. Los usarás en la siguiente guía.
+Al terminar, guarda tres outputs: `github_actions_role_arn`, `aws_region` y `project_name`. Los usarás en la [Fase 2 de CI/CD](ci-cd.md#fase-2-despues-de-crear-aws).
 
 AWS enviará un correo a `alarm_email`. Confirma la suscripción para recibir alertas.
 
 > La primera tarea ECS fallará al iniciar porque la imagen todavía no existe. Es normal: GitHub creará la primera imagen en el siguiente paso.
 
-## Paso 4: continuar en GitHub
+## Paso 4: completar CI/CD y desplegar
 
-Sigue [Configurar CI/CD en GitHub](ci-cd.md). Cuando el workflow termine, obtén la dirección pública ejecutando:
+Completa la [Fase 2 de CI/CD](ci-cd.md#fase-2-despues-de-crear-aws) para guardar los outputs en GitHub y lanzar el primer despliegue. Cuando el workflow termine, obtén la dirección pública ejecutando:
 
 ```bash
 terraform output alb_dns_name

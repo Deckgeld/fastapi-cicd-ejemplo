@@ -5,9 +5,9 @@ CI/CD significa automatizar dos tareas:
 - **CI** comprueba que el código funciona con lint y tests.
 - **CD** crea una imagen Docker y la despliega en AWS.
 
-Esta guía empieza después de completar [Crear AWS con Terraform](aws-setup.md).
+Esta guía tiene una fase de preparación de GitHub antes de crear AWS y otra posterior para guardar los outputs de Terraform y desplegar.
 
-## Configuración del repositorio
+## Fase 1: preparar GitHub antes de AWS
 
 Antes del primer despliegue, revisa estas opciones en GitHub:
 
@@ -16,10 +16,40 @@ Antes del primer despliegue, revisa estas opciones en GitHub:
 | **Settings > General** | Default branch | `main` |
 | **Settings > Actions > General** | Actions permissions | Permitir las acciones de GitHub; los workflows usan acciones oficiales. |
 | **Settings > Actions > General** | Workflow permissions | `Read repository contents`. El workflow declara los permisos AWS que necesita. |
-| **Settings > Environments** | Entorno | Crear `production` antes del primer deploy. |
-| **Settings > Branches** | Ramas protegidas | Añadir protección a `main` y `dev` después de la primera ejecución de CI. |
+| **Settings > Environments** | Entorno | Crear y configurar `production` antes del primer deploy. Consulta [Crear el entorno `production`](#crear-el-entorno-production). |
+| **Settings > Rules > Rulesets** | Ramas protegidas | Crear reglas para `main` y `dev` después de la primera ejecución de CI. Consulta [Reglas de protección de ramas](#reglas-de-proteccion-de-ramas). |
 
 No crees Access Keys de AWS en GitHub. El proyecto usa OIDC: GitHub obtiene permisos temporales para cada despliegue.
+
+## Crear el entorno `production`
+
+En GitHub, ve a **Settings > Environments > New environment** y crea uno llamado exactamente `production`.
+
+| Ajuste | Configuración | Por qué |
+|---|---|---|
+| **Required reviewers** | Actívalo y añádete. | Obliga a confirmar manualmente cada despliegue. |
+| **Deployment branches and tags** | Selecciona solo `main`. | Impide que otra rama despliegue a producción. |
+
+Deja desactivados el temporizador, las reglas de GitHub Apps y el bypass de administradores. Deja vacíos los secretos y variables del entorno: este proyecto no los usa ahí.
+
+Pulsa **Save protection rules**. Después continúa con [Crear AWS con Terraform](aws-setup.md).
+
+## Reglas de protección de ramas
+
+Después de ver al menos una ejecución de CI, ve a **Settings > Rules > Rulesets > New branch ruleset**. Crea una regla para `main` y otra para `dev`; usa **Target branches > Add Target > branches Include by pattern** para elegir cada rama. La primera ejecución hace que GitHub muestre el check `Lint y Tests`.
+
+En ambas reglas, activa solo esto:
+
+| Opción | Configuración | Por qué |
+|---|---|---|
+| **Require a pull request before merging** | Activar | Evita cambios directos en la rama. |
+| **Require status checks to pass** | Activar y añadir `Lint y Tests` | Solo permite código que pasa lint y tests. |
+| **Block force pushes** | Activar | Evita reescribir el historial compartido. |
+| **Restrict deletions** | Activar | Impide borrar la rama por accidente. |
+
+En un equipo, dentro de la opción de Pull Request, exige **1 aprobación**. Si trabajas solo, déjala en `0`: GitHub no permite aprobar tu propio Pull Request. Mantén la regla en estado **Active** y sin personas en **Bypass list**.
+
+Pulsa **Create** y repite la configuración para la otra rama. Si tu repositorio usa la interfaz antigua, la ruta es **Settings > Branches > Add branch protection rule** y las opciones son las mismas.
 
 ## Ramas y flujo de trabajo
 
@@ -44,27 +74,15 @@ git push -u origin dev
 
 Para cada cambio, crea una rama desde `dev`, haz commit y push, y abre un Pull Request hacia `dev`. Cuando esté probado, abre un Pull Request de `dev` hacia `main`. No hagas push directo a `main`.
 
-## Reglas de protección de ramas
-
-Después de ver al menos una ejecución de CI, ve a **Settings > Rules > Rulesets**. Si tu repositorio muestra la interfaz anterior, usa **Settings > Branches**. Crea una regla para `main` y otra para `dev`.
-
-| Regla | `main` | `dev` |
-|---|---|---|
-| Require a pull request before merging | Sí | Sí |
-| Require status checks to pass | `Lint y Tests` | `Lint y Tests` |
-| Block force pushes | Sí | Sí |
-| Restrict deletions | Sí | Sí |
-| Required approvals | 1 en equipo | 1 en equipo |
-
-Si trabajas solo, GitHub puede impedir que apruebes tu propio Pull Request. Mantén obligatorios los checks de CI y usa el entorno `production` como confirmación manual antes del deploy.
-
 ## Otras opciones recomendadas
 
 - En **Settings > Security**, activa Dependabot alerts y secret scanning si están disponibles para tu repositorio.
 - En **Settings > Actions > General**, deja los permisos del workflow en solo lectura; el archivo `cd.yml` solicita explícitamente `id-token: write` solo durante el despliegue.
 - En **Settings > Environments > production**, exige aprobación manual para evitar cambios accidentales en AWS.
 
-## Paso 1: guardar tres valores en GitHub
+## Fase 2: después de crear AWS
+
+### Guardar tres valores en GitHub
 
 Terraform imprimió tres valores al terminar. En GitHub, abre tu repositorio y ve a **Settings > Secrets and variables > Actions**.
 
@@ -84,24 +102,22 @@ En **Variables**, crea estos dos valores:
 
 | Nombre | Valor que debes pegar |
 |---|---|
-| `AWS_REGION` | Output de Terraform `aws_region`, por ejemplo `eu-north-1` |
+| `AWS_REGION` | Output de Terraform `aws_region`, por ejemplo `us-east-2` |
 | `PROJECT_NAME` | Output de Terraform `project_name`, por ejemplo `fastapi-cicd` |
 
 En el workflow, `${{ vars.AWS_REGION }}` significa "lee la variable `AWS_REGION` guardada en GitHub". Después se convierte en `AWS_REGION` para los comandos que se ejecutan durante el workflow.
 
-## Paso 2: pedir aprobación antes de desplegar
+El workflow declara `environment: production` en el job **Deploy a Producción**. Por eso, cuando ese job empiece, GitHub lo mostrará como **Waiting**. Abre la ejecución desde **Actions**, pulsa **Review deployments**, selecciona `production`, escribe un comentario opcional y confirma **Approve and deploy**. Solo entonces ese job obtiene credenciales temporales de AWS y actualiza ECS.
 
-En GitHub, ve a **Settings > Environments > New environment** y crea uno llamado exactamente `production`.
-
-Activa **Required reviewers** y añádete. A partir de ahora, cada despliegue se detiene antes de cambiar AWS y debes aprobarlo desde la pestaña **Actions**.
-
-## Paso 3: lanzar el primer despliegue
+## Fase 3: lanzar el primer despliegue
 
 1. Abre la pestaña **Actions** en GitHub.
 2. Selecciona **CD - Build y Deploy a AWS**.
 3. Pulsa **Run workflow**, elige la rama `main` y confirma.
 4. El job construye la imagen y se detiene esperando la aprobación de `production`.
 5. Aprueba el despliegue y espera a que ambos jobs estén en verde.
+
+Si no aparece **Run workflow**, abre un Pull Request de `dev` hacia `main` y haz merge. GitHub solo muestra ese botón cuando `cd.yml` con `workflow_dispatch` ya existe en la rama predeterminada (`main`). Ese primer merge inicia el despliegue automáticamente; el botón aparecerá para ejecuciones posteriores.
 
 Después abre la dirección `alb_dns_name` que obtuviste con Terraform y añade `/docs`.
 

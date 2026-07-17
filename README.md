@@ -36,8 +36,8 @@ graph TB
             ALB[Application Load Balancer<br/>fastapi-cicd-alb]
             TG[Target Group<br/>fastapi-cicd-tg:8000]
 
-            AZ1["eu-north-1a<br/>Subnet pública 10.0.0.0/24<br/><br/>Contiene:<br/>- ALB Network Interface<br/>- Fargate Task actual"]
-            AZ2["eu-north-1b<br/>Subnet pública 10.0.1.0/24<br/><br/>Contiene:<br/>- ALB Network Interface<br/>- sin tarea por ahora"]
+            AZ1["us-east-2a<br/>Subnet pública 10.0.0.0/24<br/><br/>Contiene:<br/>- ALB Network Interface<br/>- Fargate Task actual"]
+            AZ2["us-east-2b<br/>Subnet pública 10.0.1.0/24<br/><br/>Contiene:<br/>- ALB Network Interface<br/>- sin tarea por ahora"]
         end
 
         subgraph ECS["Amazon ECS Fargate"]
@@ -126,10 +126,11 @@ Al terminar las pruebas, elimina los recursos con `terraform destroy` desde la c
 
 1. Crea una copia del repositorio en tu cuenta de GitHub mediante **Fork** y clónala en tu equipo.
 2. Comprueba la API localmente con Docker.
-3. Sigue [Crear infraestructura en AWS](docs/aws-setup.md).
-4. Sigue [Configurar CI/CD en GitHub](docs/ci-cd.md).
-5. Haz push a `main`, aprueba el entorno `production` y comprueba la API.
-6. Consulta [Logs y alarmas](docs/cloudwatch-alarms.md).
+3. Prepara el repositorio, las ramas y el entorno `production` con la [Fase 1 de CI/CD](docs/ci-cd.md#fase-1-preparar-github-antes-de-aws).
+4. Sigue [Crear infraestructura en AWS](docs/aws-setup.md).
+5. Guarda los outputs de Terraform y ejecuta el despliegue con la [Fase 2 de CI/CD](docs/ci-cd.md#fase-2-despues-de-crear-aws).
+6. Aprueba el entorno `production` y comprueba la API.
+7. Consulta [Logs y alarmas](docs/cloudwatch-alarms.md).
 
 ## Probar la API localmente
 
