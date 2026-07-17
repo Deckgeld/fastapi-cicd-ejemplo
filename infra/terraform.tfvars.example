@@ -1,0 +1,5 @@
+aws_region   = "us-east-2"
+project_name = "fastapi-cicd"
+github_org   = "tu-usuario"
+github_repo  = "fastapi-cicd-ejemplo"
+alarm_email  = "tu-correo@example.com"
